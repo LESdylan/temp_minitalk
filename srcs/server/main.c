@@ -74,9 +74,19 @@ void	signal_handler(int signum, siginfo_t *info, void *context)
 	if (handle_new_client(client, info))
 		return;
 		
-	// Handle busy server
-	if (handle_busy_server(client, info))
-		return;
+	// Handle busy server - but don't interfere with active transmission
+	if (client->actual_pid > 0 && client->actual_pid != info->si_pid)
+	{
+		// Only handle busy signals for ping attempts, not data transmission
+		if (client->getting_header || client->getting_msg)
+		{
+			log_msg(LOG_WARNING, "Ignoring signal from PID %d during active transmission with %d", 
+				info->si_pid, client->actual_pid);
+			return;
+		}
+		if (handle_busy_server(client, info))
+			return;
+	}
 	
 	// Process data from authorized client
 	if (client->actual_pid == info->si_pid)
@@ -89,8 +99,8 @@ void	signal_handler(int signum, siginfo_t *info, void *context)
 	}
 	else
 	{
-		log_msg(LOG_WARNING, "Ignoring signal from unauthorized PID %d", info->si_pid);
-		kill(info->si_pid, SERVER_BUSY);
+		log_msg(LOG_WARNING, "Ignoring signal from unauthorized PID %d (current: %d)", 
+			info->si_pid, client->actual_pid);
 	}
 }
 

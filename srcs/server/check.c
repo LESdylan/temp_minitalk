@@ -16,19 +16,40 @@ int	check_clean_status(void)
 {
 	t_client_state	*client;
 	static int		last_pid = 0;
+	static int		consecutive_checks = 0;
 
 	client = get_client_instance();
 	if (client->actual_pid == 0)
 	{
 		last_pid = 0;
+		consecutive_checks = 0;
 		sleep(1);
 		return (1);
 	}
+	
+	// Verify client process still exists
+	if (client->actual_pid > 0 && kill(client->actual_pid, 0) == -1)
+	{
+		log_msg(LOG_WARNING, "Client process %d no longer exists, cleaning up", client->actual_pid);
+		clean_global();
+		return (1);
+	}
+	
 	if (last_pid != client->actual_pid)
 	{
 		last_pid = client->actual_pid;
+		consecutive_checks = 0;
 		log_msg(LOG_DEBUG, "Starting monitoring for client %d", last_pid);
 	}
+	
+	consecutive_checks++;
+	// Reset client activity check every 100 iterations to prevent false timeouts
+	if (consecutive_checks % 100 == 0)
+	{
+		client->client_activity = 1;
+		log_msg(LOG_DEBUG, "Periodic activity reset for client %d", client->actual_pid);
+	}
+	
 	return (monitor_client_timeout(client));
 }
 

@@ -67,18 +67,26 @@ int	pong(int pid)
 
 void	send_multiple_acks(pid_t client_pid)
 {
+	int i;
+	
 	if (client_pid <= 0)
 	{
 		log_msg(LOG_ERROR, "Invalid client PID for acknowledgment: %d", client_pid);
 		return;
 	}
 	
-	if (kill(client_pid, SIGUSR2) == -1)
+	// Send ACK signal multiple times to ensure delivery
+	for (i = 0; i < 2; i++)
 	{
-		log_msg(LOG_ERROR, "Failed to send acknowledgment to client %d", client_pid);
-		return;
+		if (kill(client_pid, SIGUSR2) == -1)
+		{
+			log_msg(LOG_ERROR, "Failed to send acknowledgment to client %d", client_pid);
+			return;
+		}
+		if (i < 1)  // Small delay between signals
+			usleep(500);
 	}
-	log_msg(LOG_DEBUG, "Sent acknowledgment signal to client %d", client_pid);
+	log_msg(LOG_DEBUG, "Sent acknowledgment signals to client %d", client_pid);
 }
 
 int	lost_signal(int s_si_pid, int signum, void *context)

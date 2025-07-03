@@ -54,14 +54,50 @@ void	send_data_bit(int bit_value, t_client *info)
 void	send_bit(unsigned long long value, int i, t_client *info)
 {
 	int	bit_value;
+	int retry_count = 0;
+	int max_retries = 3;
 
 	bit_value = 0;
 	if (value &(1ULL << i))
 		bit_value = 1;
 	log_msg(LOG_DEBUG, "Sending bit %d: %d to server PID %d", i, bit_value,
 		info->server_pid);
-	send_data_bit(bit_value, info);
-	wait_for_server_ack();
+	
+	while (retry_count < max_retries)
+	{
+		send_data_bit(bit_value, info);
+		
+		// Try to get acknowledgment
+		t_server_state *server = get_server_instance();
+		server->ready_to_proceed = 0;
+		
+		// Wait for ACK with timeout
+		int timeout = 0;
+		while (!server->ready_to_proceed && timeout < 50000) // 5 second timeout
+		{
+			usleep(100);
+			timeout++;
+		}
+		
+		if (server->ready_to_proceed)
+		{
+			server->ready_to_proceed = 0;
+			return; // Success
+		}
+		
+		retry_count++;
+		if (retry_count < max_retries)
+		{
+			log_msg(LOG_WARNING, "No ACK received for bit %d, retrying (%d/%d)", 
+				i, retry_count, max_retries);
+			usleep(10000); // Wait 10ms before retry
+		}
+	}
+	
+	// If we get here, all retries failed
+	ft_printf("Error: Failed to send bit after %d retries\n", max_retries);
+	log_msg(LOG_ERROR, "Bit transmission failed after %d retries", max_retries);
+	exit(EXIT_FAILURE);
 }
 
 void	send_signals(void *data, size_t bit_length, t_client *info)
