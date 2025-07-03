@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 02:11:03 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 18:19:21 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:14:15 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,14 @@ void	send_signal(pid_t pid, int signal)
 		signal_name = "SIGUSR1 (0)";
 	else
 		signal_name = "SIGUSR2 (1)";
+		
+	if (pid <= 0)
+	{
+		ft_printf("Error: Invalid server PID: %d\n", pid);
+		log_msg(LOG_ERROR, "Invalid server PID: %d", pid);
+		exit(EXIT_FAILURE);
+	}
+		
 	if (kill(pid, 0) == -1)
 	{
 		ft_printf("Error: Server process PID %d no longer exists\n", pid);
@@ -28,8 +36,8 @@ void	send_signal(pid_t pid, int signal)
 	}
 	if (kill(pid, signal) == -1)
 	{
-		ft_printf("Error: Signal sending failed\n");
-		log_msg(LOG_ERROR, "Failed to send signal %d to PID %d", signal, pid);
+		ft_printf("Error: Signal sending failed to PID %d\n", pid);
+		log_msg(LOG_ERROR, "Failed to send signal %d to PID %d: %s", signal, pid, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	log_msg(LOG_DEBUG, "Sent signal %s to server PID %d", signal_name, pid);

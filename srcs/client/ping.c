@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/07/03 02:15:33 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 17:11:08 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:42:00 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,16 +43,26 @@ int	send_ping_signal(int pid)
 
 int	attempt_ping(int pid, int attempt)
 {
+	t_server_state *server;
+	
 	log_ping_attempt(attempt, RETRY_TIMES);
 	if (!validate_process_exists(pid))
 		return (-1);
 	if (!send_ping_signal(pid))
 		return (-1);
+		
+	server = get_server_instance();
 	if (check_server_and_sleep())
 	{
-		log_ping_result(attempt, 1);
-		return (1);
+		if (server->is_ready == 1)
+		{
+			log_ping_result(attempt, 1);
+			return (1);
+		}
+		// Server responded but is busy
+		log_msg(LOG_INFO, "Server is busy, will retry");
 	}
+	
 	log_ping_result(attempt, 0);
 	handle_retry_delay(attempt);
 	return (0);
