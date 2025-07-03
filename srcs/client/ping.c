@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/07/03 02:15:33 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 19:42:00 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:47:33 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,6 +44,7 @@ int	send_ping_signal(int pid)
 int	attempt_ping(int pid, int attempt)
 {
 	t_server_state *server;
+	int timeout_count;
 	
 	log_ping_attempt(attempt, RETRY_TIMES);
 	if (!validate_process_exists(pid))
@@ -52,15 +53,26 @@ int	attempt_ping(int pid, int attempt)
 		return (-1);
 		
 	server = get_server_instance();
-	if (check_server_and_sleep())
+	server->is_ready = 0;  // Reset before waiting
+	
+	// Wait for response with timeout
+	timeout_count = 0;
+	while (timeout_count < 10000000)  // 10 seconds timeout for queue waiting
 	{
+		usleep(1000);
+		timeout_count += 1000;
+		
 		if (server->is_ready == 1)
 		{
 			log_ping_result(attempt, 1);
 			return (1);
 		}
-		// Server responded but is busy
-		log_msg(LOG_INFO, "Server is busy, will retry");
+		else if (server->is_ready == -1)  // Server busy - we're in queue
+		{
+			log_msg(LOG_INFO, "Server is busy, waiting in queue...");
+			// Continue waiting for ready signal
+			server->is_ready = 0;  // Reset to continue waiting
+		}
 	}
 	
 	log_ping_result(attempt, 0);
@@ -81,12 +93,14 @@ int	ping(int pid)
 	server->is_ready = 0;
 	server->ready_to_proceed = 0;
 	server->transmission_active = 0;
+	
 	if (handle_timeouts(pid))
 	{
 		ft_printf("Error: Couldn't reach server PID %d\n", pid);
 		log_msg(LOG_ERROR, "Server ping timeout");
 		return (0);
 	}
+	
 	ft_printf("Server ready, waiting for transmission slot...\n");
 	log_msg(LOG_SUCCESS, "Server connection established");
 	return (1);

@@ -25,6 +25,7 @@
 # define EXIT_FAILURE 1
 # define TIMEOUT	50000
 # define SLEEP_TIME 50000
+# define MAX_QUEUE_SIZE 10
 
 typedef struct s_message
 {
@@ -48,6 +49,10 @@ typedef struct s_client_state
 	int			expected_checksum;
 	int			calculated_checksum;
 	t_message	msg;
+	pid_t		client_queue[MAX_QUEUE_SIZE];
+	int			queue_size;
+	int			queue_head;
+	int			queue_tail;
 }	t_client_state;
 
 /* Singleton functions */
@@ -57,6 +62,8 @@ void			reset_client_state(t_client_state *client);
 /* Queue management functions */
 int				is_server_busy(void);
 void			set_server_busy(pid_t client_pid);
+int				enqueue_client(pid_t client_pid);
+pid_t			dequeue_client(void);
 
 /* Signal handling functions */
 void			signal_handler(int signum, siginfo_t *info, void *context);

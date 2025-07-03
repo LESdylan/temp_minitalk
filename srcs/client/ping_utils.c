@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/07/03 03:15:33 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 19:38:51 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:59:54 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ void	handle_pong(int signum, t_server_state *server, pid_t pid)
 	}
 	else if (signum == SIGUSR2)
 	{
-		server->is_ready = 0;
+		server->is_ready = -1;  // Use -1 to indicate busy
 		log_msg(LOG_WARNING, "Server busy signal received from PID %d", pid);
 	}
 }
@@ -45,7 +45,7 @@ void	send_message(char *str, t_client *data)
 		send_signals(&str[i], 8, data);
 		i++;
 	}
-	if (total_chars > 5000)
+	if (total_chars > 1000)
 		ft_printf("Progress: 100%% (%d/%d characters) - Complete!\n",
 			i, total_chars);
 	log_msg(LOG_SUCCESS, "Message transmission complete: %d characters sent",

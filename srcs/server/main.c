@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/02 19:00:00 by dlesieur          #+#    #+#             */
-/*   Updated: 2025/07/03 19:42:00 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:47:32 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,8 @@ static int	handle_new_client(t_client_state *client, siginfo_t *info)
 	{
 		log_msg(LOG_INFO, "New client connection from PID %d", info->si_pid);
 		client->client_pid = info->si_pid;
-		return (pong(client->client_pid), 1);
+		pong(client->client_pid);
+		return (1);
 	}
 	return (0);
 }
@@ -69,27 +70,28 @@ void	signal_handler(int signum, siginfo_t *info, void *context)
 		return;
 	}
 	
+	// Handle new client connection first
 	if (handle_new_client(client, info))
 		return;
 		
+	// Handle busy server
 	if (handle_busy_server(client, info))
 		return;
 	
-	// Verify this signal is from the current active client
-	if (client->actual_pid != info->si_pid)
+	// Process data from authorized client
+	if (client->actual_pid == info->si_pid)
 	{
-		log_msg(LOG_WARNING, "Ignoring signal from PID %d, current client is %d", 
-			info->si_pid, client->actual_pid);
-		// Send busy signal to unauthorized client
-		kill(info->si_pid, SERVER_BUSY);
-		return;
+		client->client_pid = info->si_pid;
+		client->client_activity = 1;
+		log_msg(LOG_DEBUG, "Processing signal %d from active client %d",
+			signum, client->client_pid);
+		process_data_signal(client, signum);
 	}
-	
-	client->client_pid = info->si_pid;
-	client->client_activity = 1;
-	log_msg(LOG_DEBUG, "Processing signal %d from active client %d",
-		signum, client->client_pid);
-	process_data_signal(client, signum);
+	else
+	{
+		log_msg(LOG_WARNING, "Ignoring signal from unauthorized PID %d", info->si_pid);
+		kill(info->si_pid, SERVER_BUSY);
+	}
 }
 
 int	main(void)

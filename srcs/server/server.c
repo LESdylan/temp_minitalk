@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 02:22:54 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 18:31:18 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:59:54 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,6 +68,7 @@ void	handle_header(int signum)
 	{
 		log_msg(LOG_INFO, "Header complete: message size = %d bytes (0x%x)",
 			client->msg.size_message, (unsigned int)client->msg.size_message);
+		ft_printf("DEBUG: Received message size: %d bytes\n", client->msg.size_message);
 		if (!validate_message_size(client->msg.size_message))
 		{
 			reset_client_state(client);

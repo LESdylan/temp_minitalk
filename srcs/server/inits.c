@@ -27,6 +27,10 @@ t_client_state	*get_client_instance(void)
 		instance.sequence_number = 0;
 		instance.expected_checksum = 0;
 		instance.calculated_checksum = 0;
+		// Initialize queue
+		instance.queue_size = 0;
+		instance.queue_head = 0;
+		instance.queue_tail = 0;
 		initialized = 1;
 	}
 	return (&instance);
@@ -56,6 +60,7 @@ void	reset_client_state(t_client_state *client)
 void	clean_global(void)
 {
 	t_client_state	*client;
+	pid_t			next_client;
 
 	client = get_client_instance();
 	if (client->actual_pid > 0)
@@ -70,6 +75,22 @@ void	clean_global(void)
 		free(client->msg.message);
 		client->msg.message = NULL;
 	}
-	reset_client_state(client);
-	log_msg(LOG_INFO, "Client state cleaned, ready for new connections");
+	
+	// Check if there's a next client in queue
+	next_client = dequeue_client();
+	if (next_client > 0)
+	{
+		log_msg(LOG_INFO, "Serving next client in queue: PID %d", next_client);
+		reset_client_state(client);
+		client->actual_pid = next_client;
+		client->client_pid = next_client;
+		client->getting_header = 1;
+		client->transmission_active = 1;
+		kill(next_client, SERVER_READY);
+	}
+	else
+	{
+		reset_client_state(client);
+		log_msg(LOG_INFO, "Client state cleaned, ready for new connections");
+	}
 }

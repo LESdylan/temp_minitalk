@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 16:21:00 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 17:10:51 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:59:52 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,9 +39,33 @@ int	connect_to_server(t_client *data)
 
 void	start_transmission(t_client *data, int msg_len)
 {
+	int actual_len;
+
 	wait_for_transmission_slot(data);
+	
+	// Double-check the message length
+	actual_len = ft_strlen(data->msg);
+	if (actual_len != msg_len)
+	{
+		ft_printf("Error: Message length mismatch! Expected %d, got %d\n", msg_len, actual_len);
+		log_msg(LOG_ERROR, "Message length mismatch: expected %d, actual %d", msg_len, actual_len);
+		exit(EXIT_FAILURE);
+	}
+	
 	ft_printf("Starting transmission (%d characters)...\n", msg_len);
-	log_msg(LOG_INFO, "Starting header transmission (message length)");
+	log_msg(LOG_INFO, "Starting header transmission (message length: %d)", msg_len);
+	
+	// Validate message length before sending
+	if (msg_len <= 0 || msg_len > 10000000)
+	{
+		ft_printf("Error: Invalid message length: %d\n", msg_len);
+		log_msg(LOG_ERROR, "Invalid message length: %d", msg_len);
+		exit(EXIT_FAILURE);
+	}
+	
+	// Debug: Show what we're about to send
+	ft_printf("DEBUG: Sending header with value %d (0x%x)\n", msg_len, msg_len);
+	
 	send_signals(&msg_len, 32, data);
 	log_msg(LOG_INFO, "Header transmission complete, starting message content");
 	send_message(data->msg, data);

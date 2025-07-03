@@ -19,12 +19,20 @@ int	pong(int pid)
 	client = get_client_instance();
 	if (is_server_busy() && client->actual_pid != pid)
 	{
-		log_msg(LOG_INFO, "Server busy with PID %d, sending busy signal to client %d", client->actual_pid, pid);
-		if (kill(pid, SERVER_BUSY) == -1)
+		// Add client to queue instead of rejecting
+		if (enqueue_client(pid))
 		{
-			log_msg(LOG_ERROR, "Failed to send busy signal to PID %d", pid);
+			log_msg(LOG_INFO, "Server busy with PID %d, adding client %d to queue (position %d)", 
+				client->actual_pid, pid, client->queue_size);
+			kill(pid, SERVER_BUSY);  // Tell client to wait
+			return (EXIT_SUCCESS);
 		}
-		return (EXIT_SUCCESS);
+		else
+		{
+			log_msg(LOG_ERROR, "Queue full, rejecting client %d", pid);
+			kill(pid, SERVER_BUSY);
+			return (EXIT_SUCCESS);
+		}
 	}
 	
 	// Clean any previous state before accepting new client

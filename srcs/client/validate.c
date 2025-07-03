@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 17:16:35 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 17:18:30 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:48:56 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,7 +42,7 @@ int	validate_ping_signal(t_server_state *server, siginfo_t *info)
 	if (info->si_pid == my_pid)
 	{
 		log_msg(LOG_ERROR, "Received signal from own process");
-		exit(EXIT_FAILURE);
+		return (0);
 	}
 	if (server->pid != 0 && info->si_pid != server->pid)
 	{
@@ -50,11 +50,7 @@ int	validate_ping_signal(t_server_state *server, siginfo_t *info)
 			info->si_pid, server->pid);
 		return (0);
 	}
-	if (server->transmission_active)
-	{
-		log_msg(LOG_DEBUG, "Ignoring ping during active transmission");
-		return (0);
-	}
+	// Remove transmission_active check - we need to receive pings during transmission
 	return (1);
 }
 

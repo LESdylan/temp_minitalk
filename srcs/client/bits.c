@@ -6,7 +6,7 @@
 /*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 02:11:03 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 19:14:15 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/03 19:59:52 by codespace        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -73,15 +73,23 @@ void	send_signals(void *data, size_t bit_length, t_client *info)
 	if (bit_length == 8)
 		value = *((unsigned char *)data);
 	else if (bit_length == 32)
+	{
 		value = *((unsigned int *)data);
+		// Add validation for message length
+		if (value > 10000000 || value == 0)
+		{
+			ft_printf("Error: Invalid message length: %llu\n", value);
+			log_msg(LOG_ERROR, "Invalid message length: %llu", value);
+			exit(EXIT_FAILURE);
+		}
+	}
 	log_msg(LOG_INFO, "Sending %zu-bit value: %llu (0x%llx) to server PID %d",
-		bit_length,
-		value, value, info->server_pid);
+		bit_length, value, value, info->server_pid);
 	i = bit_length - 1;
 	while (i >= 0)
 	{
 		send_bit(value, i, info);
 		i--;
 	}
-	log_msg(LOG_SUCCESS, "Successfully sent %zu bits", bit_length);
+	log_msg(LOG_SUCCESS, "Successfully sent %zu bits (value: %llu)", bit_length, value);
 }
