@@ -3,16 +3,16 @@
 /*                                                        :::      ::::::::   */
 /*   main.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
+/*   By: dlesieur <dlesieur@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/02 19:00:00 by dlesieur          #+#    #+#             */
-/*   Updated: 2025/07/03 19:47:32 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/04 12:30:19 by dlesieur         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "server.h"
 
-static int	handle_new_client(t_client_state *client, siginfo_t *info)
+static int handle_new_client(t_client_state *client, siginfo_t *info)
 {
 	if (client->actual_pid == 0)
 	{
@@ -24,113 +24,168 @@ static int	handle_new_client(t_client_state *client, siginfo_t *info)
 	return (0);
 }
 
-static int	handle_busy_server(t_client_state *client, siginfo_t *info)
+static int handle_busy_server(t_client_state *client, siginfo_t *info)
 {
+	// If server is busy with a different client, add to queue
 	if (client->actual_pid > 0 && client->actual_pid != info->si_pid)
 	{
-		log_msg(LOG_WARNING, "Server busy with PID %d, rejecting signal from PID %d",
-			client->actual_pid, info->si_pid);
-		
-		// Send busy signal multiple times to ensure client receives it
-		for (int i = 0; i < 3; i++)
+		// Check if this client is already in queue
+		for (int i = 0; i < client->queue_size; i++)
 		{
-			if (kill(info->si_pid, SERVER_BUSY) == -1)
+			int queue_index = (client->queue_head + i) % MAX_QUEUE_SIZE;
+			if (client->client_queue[queue_index] == info->si_pid)
 			{
-				log_msg(LOG_ERROR, "Failed to send busy signal to PID %d", info->si_pid);
-				break;
+				log_msg(LOG_DEBUG, "Client %d already in queue, sending busy signal", info->si_pid);
+				// Send busy signal to remind client to wait
+				kill(info->si_pid, SERVER_BUSY);
+				return (1);
 			}
-			usleep(1000); // Small delay between signals
+		}
+
+		// Add new client to queue
+		if (enqueue_client(info->si_pid))
+		{
+			log_msg(LOG_INFO, "Server busy with PID %d, added client %d to queue (position %d)",
+					client->actual_pid, info->si_pid, client->queue_size);
+			kill(info->si_pid, SIGUSR1); // Use SIGUSR1 for SERVER_BUSY
+		}
+		else
+		{
+			log_msg(LOG_ERROR, "Queue full, rejecting client %d", info->si_pid);
+			kill(info->si_pid, SIGUSR1); // Use SIGUSR1 for SERVER_BUSY
 		}
 		return (1);
 	}
 	return (0);
 }
 
-static void	process_data_signal(t_client_state *client, int signum)
+static void process_data_signal(t_client_state *client, int signum)
 {
-	if (client->getting_msg == 1)
-		handle_msg(signum);
-	else if (client->getting_header == 1)
-		handle_header(signum);
-	send_multiple_acks(client->client_pid);
-}
+	static volatile int processing = 0;
 
-void	signal_handler(int signum, siginfo_t *info, void *context)
-{
-	t_client_state	*client;
-	pid_t original_pid;
+	ft_printf("DEBUG_SIGNAL: process_data_signal() called with signal %s\n",
+		signum == SIGUSR1 ? "SIGUSR1" : "SIGUSR2");
+	ft_printf("DEBUG_SIGNAL: getting_header=%d, getting_msg=%d\n",
+		client->getting_header, client->getting_msg);
 
-	client = get_client_instance();
-	original_pid = info->si_pid;
-	info->si_pid = lost_signal(info->si_pid, signum, context);
-	
-	if (info->si_pid <= 0 || info->si_pid == getpid())
+	// Prevent re-entrant signal processing that could cause bit shifts
+	if (processing)
 	{
-		log_msg(LOG_ERROR, "Invalid signal source PID: %d (original: %d)", info->si_pid, original_pid);
+		ft_printf("DEBUG_SIGNAL: Signal processing already in progress, ignoring\n");
+		log_msg(LOG_WARNING, "Signal processing already in progress, ignoring signal");
 		return;
 	}
+
+	processing = 1;
+
+	// Process the signal
+	if (client->getting_msg == 1)
+	{
+		ft_printf("DEBUG_SIGNAL: Processing message signal\n");
+		handle_msg(signum);
+	}
+	else if (client->getting_header == 1)
+	{
+		ft_printf("DEBUG_SIGNAL: Processing header signal\n");
+		handle_header(signum);
+	}
+	else
+	{
+		ft_printf("DEBUG_SIGNAL: WARNING: Neither getting_header nor getting_msg is set!\n");
+	}
+
+	processing = 0;
+
+	// Send immediate acknowledgment - but check if client still exists
+	if (client->client_pid > 0 && kill(client->client_pid, 0) == 0)
+	{
+		if (kill(client->client_pid, SIGUSR2) == -1)
+		{
+			ft_printf("DEBUG_SIGNAL: Failed to send ACK to client %d\n", client->client_pid);
+			log_msg(LOG_ERROR, "Failed to send acknowledgment to client %d", client->client_pid);
+		}
+		else
+		{
+			ft_printf("DEBUG_SIGNAL: ACK sent to client %d\n", client->client_pid);
+		}
+	}
+	else
+	{
+		ft_printf("DEBUG_SIGNAL: Client %d no longer exists\n", client->client_pid);
+		log_msg(LOG_WARNING, "Client %d no longer exists, cleaning up", client->client_pid);
+		clean_global();
+	}
+}
+
+void signal_handler(int signum, siginfo_t *info, void *context)
+{
+	t_client_state *client;
+	pid_t sender_pid;
+
+	(void)context;
+	client = get_client_instance();
+
+	// CRITICAL FIX: Use direct PID instead of lost_signal() to avoid bit shift
+	sender_pid = info->si_pid;
 	
+	ft_printf("DEBUG_DIRECT: Direct PID processing: original=%d, using=%d\n", 
+		info->si_pid, sender_pid);
+
+	if (sender_pid <= 0 || sender_pid == getpid())
+	{
+		log_msg(LOG_ERROR, "Invalid signal source PID: %d", sender_pid);
+		return;
+	}
+
 	// Handle new client connection first
 	if (handle_new_client(client, info))
 		return;
-		
-	// Handle busy server - but don't interfere with active transmission
-	if (client->actual_pid > 0 && client->actual_pid != info->si_pid)
+
+	// Handle busy server
+	if (handle_busy_server(client, info))
+		return;
+
+	// Process data from authorized client only
+	if (client->actual_pid == sender_pid)
 	{
-		// Only handle busy signals for ping attempts, not data transmission
-		if (client->getting_header || client->getting_msg)
-		{
-			log_msg(LOG_WARNING, "Ignoring signal from PID %d during active transmission with %d", 
-				info->si_pid, client->actual_pid);
-			return;
-		}
-		if (handle_busy_server(client, info))
-			return;
-	}
-	
-	// Process data from authorized client
-	if (client->actual_pid == info->si_pid)
-	{
-		client->client_pid = info->si_pid;
+		client->client_pid = sender_pid;
 		client->client_activity = 1;
-		log_msg(LOG_DEBUG, "Processing signal %d from active client %d",
-			signum, client->client_pid);
 		process_data_signal(client, signum);
 	}
 	else
 	{
-		log_msg(LOG_WARNING, "Ignoring signal from unauthorized PID %d (current: %d)", 
-			info->si_pid, client->actual_pid);
+		log_msg(LOG_WARNING, "Ignoring signal from unauthorized PID %d (current: %d)",
+				sender_pid, client->actual_pid);
 	}
 }
 
-int	main(void)
+int main(void)
 {
-	struct sigaction	sa;
-	sigset_t			sigset;
-	pid_t				server_pid;
+	struct sigaction sa;
+	sigset_t sigset;
+	pid_t server_pid;
 
 	server_pid = getpid();
 	ft_printf("Server PID: %d\n", server_pid);
-	
+
 	// Setup signal handler without blocking
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGUSR1);
 	sigaddset(&sigset, SIGUSR2);
-	
+
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
 	sa.sa_sigaction = signal_handler;
 	sa.sa_mask = sigset;
-	
-	if (sigaction(SIGUSR1, &sa, NULL) == -1 || 
+
+	if (sigaction(SIGUSR1, &sa, NULL) == -1 ||
 		sigaction(SIGUSR2, &sa, NULL) == -1)
 	{
 		log_msg(LOG_ERROR, "Failed to setup signal handlers");
 		exit(EXIT_FAILURE);
 	}
-	
+
 	log_msg(LOG_INFO, "Signal handlers installed successfully");
-	
+
 	keep_server_up();
 	return (0);
 }

@@ -3,27 +3,31 @@
 /*                                                        :::      ::::::::   */
 /*   checksum.c                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: codespace <codespace@student.42.fr>        +#+  +:+       +#+        */
+/*   By: dlesieur <dlesieur@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/03 16:19:08 by codespace         #+#    #+#             */
-/*   Updated: 2025/07/03 17:00:28 by codespace        ###   ########.fr       */
+/*   Updated: 2025/07/04 11:47:39 by dlesieur         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "client.h"
 
-int	calculate_checksum(const char *data, int length)
+int calculate_checksum(const char *data, int length)
 {
-	int	checksum;
-	int	i;
+	unsigned int checksum;
+	int i;
 
-	checksum = 0;
+	checksum = 0x5A5A5A5A; // Use a non-zero seed to avoid trivial checksums
 	i = 0;
 	while (i < length)
 	{
-		checksum ^= data[i];
-		checksum = (checksum << 1) | (checksum >> 31);
+		checksum ^= (unsigned char)data[i];
+		// Use a simpler rotation to avoid overflow issues
+		checksum = ((checksum << 3) | (checksum >> 29)) ^ (i & 0xFF);
 		i++;
 	}
-	return (checksum);
+	// Ensure we don't return -1 by masking off the sign bit if needed
+	if ((int)checksum == -1)
+		checksum = 0x7FFFFFFF;
+	return ((int)checksum);
 }

@@ -3,17 +3,24 @@
 #                                                         :::      ::::::::    #
 #    Makefile                                           :+:      :+:    :+:    #
 #                                                     +:+ +:+         +:+      #
-#    By: codespace <codespace@student.42.fr>        +#+  +:+       +#+         #
+#    By: dlesieur <dlesieur@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/02 19:00:00 by dlesieur          #+#    #+#              #
-#    Updated: 2025/07/03 18:37:41 by codespace        ###   ########.fr        #
+#    Updated: 2025/07/04 12:35:57 by dlesieur         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME_SERVER = server
 NAME_CLIENT = client
+TEST_SIMPLE = test_simple
+DEBUG_TRANSMISSION = debug_transmission
+SYNC_TEST = sync_test
+FIX_SYNC = fix_sync
+FIX_ACK_SYSTEM = fix_ack_system
+DEBUG_COMPLETION = debug_completion
+DEBUG_BIT_SHIFT = debug_bit_shift
 
-FLAG_DEBUG = 1
+FLAG_DEBUG = 0
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -I./inc -I./inc/libft
 CFLAGS += -DMINITALK_DEBUG=$(FLAG_DEBUG)
@@ -62,9 +69,69 @@ $(NAME_CLIENT): $(CLIENT_OBJS) $(LIBFT_DIR)/libft.a
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Clean
-clean:
-	$(RM) $(SERVER_OBJS) $(CLIENT_OBJS)
+# Test targets
+$(TEST_SIMPLE): test_simple.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(DEBUG_TRANSMISSION): debug_transmission.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(SYNC_TEST): sync_test.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(FIX_SYNC): fix_sync.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(FIX_ACK_SYSTEM): fix_ack_system.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(DEBUG_COMPLETION): debug_completion.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(DEBUG_BIT_SHIFT): debug_bit_shift.c
+	$(CC) $(CFLAGS) -o $@ $<
+
+test: $(TEST_SIMPLE)
+	@echo "Running bit test..."
+	./$(TEST_SIMPLE)
+
+test_bit: $(TEST_SIMPLE)
+	@echo "Testing bit patterns for values 3, 4, 5..."
+	@echo "Value 3:"
+	@sed 's/unsigned int value = 4/unsigned int value = 3/' test_simple.c > test_temp.c && $(CC) $(CFLAGS) -o test_temp test_temp.c && ./test_temp
+	@echo "\nValue 4:"
+	./$(TEST_SIMPLE)
+	@echo "\nValue 5:"
+	@sed 's/unsigned int value = 4/unsigned int value = 5/' test_simple.c > test_temp.c && $(CC) $(CFLAGS) -o test_temp test_temp.c && ./test_temp
+	@rm -f test_temp test_temp.c
+
+run_debug_transmission: $(DEBUG_TRANSMISSION)
+	@echo "Running transmission debug analysis..."
+	./$(DEBUG_TRANSMISSION)
+
+run_sync_test: $(SYNC_TEST)
+	@echo "Running synchronization test..."
+	./$(SYNC_TEST)
+
+run_fix_sync: $(FIX_SYNC)
+	@echo "Running minitalk logic test..."
+	./$(FIX_SYNC)
+
+run_fix_ack: $(FIX_ACK_SYSTEM)
+	@echo "Testing minitalk with simplified ACK system..."
+	./$(FIX_ACK_SYSTEM)
+
+run_debug_completion: $(DEBUG_COMPLETION)
+	@echo "Testing completion signal delivery..."
+	./$(DEBUG_COMPLETION)
+
+run_debug_bit_shift: $(DEBUG_BIT_SHIFT)
+	@echo "Testing bit shift issue..."
+	./$(DEBUG_BIT_SHIFT)
+
+# Clean test files
+clean: 
+	$(RM) $(SERVER_OBJS) $(CLIENT_OBJS) $(TEST_SIMPLE) $(DEBUG_TRANSMISSION) $(SYNC_TEST) $(FIX_SYNC) $(FIX_ACK_SYSTEM) $(DEBUG_COMPLETION) $(DEBUG_BIT_SHIFT) test_temp test_temp.c
 	$(MAKE) -C $(LIBFT_DIR) clean
 
 fclean: clean
@@ -73,4 +140,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re test test_bit run_debug_transmission run_sync_test run_fix_sync run_fix_ack run_debug_completion run_debug_bit_shift speed_test
